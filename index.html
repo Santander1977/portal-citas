@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Portal de Citas | ESE Hospital Regional del Magdalena Medio</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="topbar"><span>📍 Barrancabermeja, Santander</span><span>Atención al usuario · PQRSDF</span></div>
+<header>
+  <a class="brand" href="#"><span class="logo">H</span><span><b>ESE HOSPITAL REGIONAL<br>DEL MAGDALENA MEDIO</b><small>Portal especializado de citas</small></span></a>
+  <nav><a href="#inicio">Inicio</a><a href="#servicios">Servicios</a><a href="#como">¿Cómo funciona?</a><a href="#ayuda">Ayuda</a></nav>
+  <a class="btn primary" href="#portal">Portal de pacientes</a>
+</header>
+
+<main id="inicio">
+<section class="hero">
+  <div class="heroText">
+    <label>PORTAL DE CITAS MÉDICAS</label>
+    <h1>Agenda tu cita<br><em>fácil, rápida y segura.</em></h1>
+    <p>Un portal especializado para gestionar tus citas médicas desde cualquier dispositivo.</p>
+    <div class="actions"><a class="btn primary big" href="#agendar">📅 Agendar cita</a><a class="btn light big" href="#portal">Consultar una cita</a></div>
+    <div class="trust"><span>✓ <b>Fácil</b><small>En pocos pasos</small></span><span>✓ <b>Seguro</b><small>Datos protegidos</small></span><span>✓ <b>Disponible</b><small>Desde cualquier lugar</small></span></div>
+  </div>
+  <div class="heroImg"><img src="assets/hero-hospital.png" alt="Diseño conceptual del portal de citas"></div>
+</section>
+
+<section class="booking" id="agendar">
+  <div class="card">
+    <div class="steps"><b>1&nbsp; Servicio</b><span>2&nbsp; Especialidad</span><span>3&nbsp; Profesional</span><span>4&nbsp; Fecha y hora</span></div>
+    <div class="inside">
+      <h2>Agenda tu cita</h2><p class="muted">Selecciona el servicio que necesitas para comenzar.</p>
+      <div class="services" id="servicios">
+        <button class="service active" data-name="Consulta externa">🩺<b>Consulta<br>externa</b></button>
+        <button class="service" data-name="Odontología">🦷<b>Odontología</b></button>
+        <button class="service" data-name="Imágenes diagnósticas">🖼️<b>Imágenes<br>diagnósticas</b></button>
+        <button class="service" data-name="Laboratorio clínico">🧪<b>Laboratorio<br>clínico</b></button>
+        <button class="service" data-name="Procedimientos">➕<b>Procedimientos</b></button>
+        <button class="service" data-name="Otros servicios">•••<b>Otros<br>servicios</b></button>
+      </div>
+      <div class="notice">ⓘ <span>Si presentas una emergencia, utiliza el servicio de urgencias. Este portal está orientado a la gestión de citas programables.</span></div>
+      <div class="actions bottom"><a class="btn light" href="#inicio">Cancelar</a><button class="btn primary" id="continue">Continuar →</button></div>
+    </div>
+  </div>
+  <aside>
+    <div class="card info"><h3>Información importante</h3><p>🕐 <b>Horarios</b><br><small>Configurar según la operación real del hospital.</small></p><p>🪪 <b>Identificación</b><br><small>Ten a mano tu documento.</small></p><p>🛡️ <b>Gestión segura</b><br><small>Conexión con sistemas autorizados.</small></p></div>
+    <div class="patient" id="portal"><small>PORTAL DE PACIENTES</small><h3>Gestiona tus citas</h3><p>Consulta, reprograma o cancela tus citas médicas.</p><button class="btn white">🔐 Iniciar sesión</button><button class="btn outline">Crear cuenta</button></div>
+  </aside>
+</section>
+
+<section class="quick">
+  <label>GESTIÓN DE CITAS</label><h2>Todo en un solo lugar</h2>
+  <div class="quickGrid"><article>📅<h3>Agendar cita</h3><p>Encuentra disponibilidad y reserva.</p></article><article>🔎<h3>Consultar cita</h3><p>Revisa tu próxima atención.</p></article><article>🔄<h3>Reprogramar</h3><p>Cambia fecha u horario.</p></article><article>✕<h3>Cancelar</h3><p>Gestiona la cancelación.</p></article></div>
+</section>
+
+<section class="how" id="como"><div><label>SENCILLO PARA EL PACIENTE</label><h2>Agendar en cuatro pasos</h2><p>La interfaz está preparada para conectarse al motor de citas de EIS Clinic IA mediante n8n y posteriormente con la API autorizada del sistema de historia clínica.</p></div>
+<div class="timeline"><div><b>01</b><strong>Identifícate</strong><p>Datos básicos.</p></div><div><b>02</b><strong>Elige el servicio</strong><p>Especialidad y profesional.</p></div><div><b>03</b><strong>Selecciona horario</strong><p>Disponibilidad.</p></div><div><b>04</b><strong>Confirma</strong><p>Recibe tu comprobante.</p></div></div></section>
+
+<section class="ai"><div class="aiBox"><span class="aiIcon">✦</span><div><label>ASISTENTE VIRTUAL</label><h2>¿Prefieres conversar?</h2><p>El mismo motor de citas puede atender por web, WhatsApp y otros canales usando n8n como orquestador.</p><button class="btn primary">Hablar con el asistente</button></div></div></section>
+
+<section class="help" id="ayuda"><div><label>¿NECESITAS AYUDA?</label><h2>Estamos para ayudarte</h2><p>Los teléfonos, horarios y políticas deben configurarse con la información oficial del hospital.</p></div><div class="helpBtns"><button class="btn light">☎ Línea de atención</button><button class="btn light">✉ Contacto</button><button class="btn light">❓ Preguntas frecuentes</button></div></section>
+</main>
+<footer><div><b>ESE Hospital Regional del Magdalena Medio</b><p>Portal especializado de citas médicas · Prototipo EIS Clinic IA</p></div><div><a>Tratamiento de datos</a> · <a>Términos</a> · <a>Accesibilidad</a></div></footer>
+<div class="toast" id="toast"></div>
+<script src="app.js"></script>
+</body>
+</html>
