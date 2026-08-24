@@ -4,7 +4,7 @@
 // (el mismo que usa el chatbot de n8n). Si el túnel se reinicia, esta URL
 // cambia y hay que actualizarla acá. Cuando exista un dominio/backend
 // permanente, reemplazar esta constante — es el único lugar que hay que tocar.
-const API_BASE = "https://dating-best-spaces-shirt.trycloudflare.com";
+const API_BASE = "https://reconstruction-principles-velocity-run.trycloudflare.com";
 
 const PASOS = [
   ["Identifícate", "Datos básicos"],
