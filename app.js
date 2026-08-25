@@ -1,10 +1,8 @@
 // Portal público de citas — conectado al backend real (EIS Clinic IA / HRMM).
 //
-// IMPORTANTE: API_BASE apunta hoy al túnel cloudflared TEMPORAL del backend
-// (el mismo que usa el chatbot de n8n). Si el túnel se reinicia, esta URL
-// cambia y hay que actualizarla acá. Cuando exista un dominio/backend
-// permanente, reemplazar esta constante — es el único lugar que hay que tocar.
-const API_BASE = "https://reconstruction-principles-velocity-run.trycloudflare.com";
+// API_BASE apunta al backend desplegado en EasyPanel (dominio permanente,
+// reemplaza al túnel cloudflared temporal que se usaba antes).
+const API_BASE = "https://curson8n-hrmm-backend.byrp3l.easypanel.host";
 
 const PASOS = [
   ["Identifícate", "Datos básicos"],
