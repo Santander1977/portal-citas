@@ -23,6 +23,7 @@ const estado = {
   servicioId: null,
   servicioNombre: "",
   disponibilidad: [],
+  cargandoDisponibilidad: false,
   fecha: null,
   slotId: null,
   hora: null,
@@ -36,7 +37,7 @@ const estado = {
 function reiniciar() {
   Object.assign(estado, {
     paso: 1, documento: "", nombre: "", telefono: "", correo: "", encontrado: null, buscando: false,
-    servicioId: null, servicioNombre: "", disponibilidad: [], fecha: null, slotId: null,
+    servicioId: null, servicioNombre: "", disponibilidad: [], cargandoDisponibilidad: false, fecha: null, slotId: null,
     hora: null, enviando: false, citaCreada: null, error: null,
     emailEnviando: false, emailResultado: null,
   });
@@ -144,6 +145,11 @@ async function irAPaso3() {
   estado.paso = 3;
   estado.fecha = null;
   estado.slotId = null;
+  // cargandoDisponibilidad evita que, mientras la petición está en curso,
+  // fechasDisponibles() devuelva [] (porque disponibilidad todavía tiene el
+  // valor del servicio anterior o está vacío) y el render muestre "no hay
+  // fechas disponibles" como falso negativo antes de tener la respuesta real.
+  estado.cargandoDisponibilidad = true;
   render();
   try {
     const disp = await apiGet("/api/agenda/disponibilidad");
@@ -153,6 +159,7 @@ async function irAPaso3() {
   } catch (e) {
     estado.error = "No pudimos cargar la disponibilidad.";
   }
+  estado.cargandoDisponibilidad = false;
   render();
 }
 
@@ -342,7 +349,9 @@ function renderPaso3() {
     <p class="muted"><b>Fecha disponible</b></p>
     <div class="slots">
       ${
-        fechas.length
+        estado.cargandoDisponibilidad
+          ? `<p class="muted">Buscando horarios disponibles…</p>`
+          : fechas.length
           ? fechas
               .slice(0, 12)
               .map(
