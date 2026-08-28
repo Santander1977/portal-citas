@@ -15,5 +15,21 @@
 .alert.info{background:#eaf7f0;color:#276048}
 .alert.error{background:#fdeceb;color:#a4342a}
 .alert.success{background:#e8f7ee;color:#0d6b3f;font-weight:700}
+.patient label{display:block;font-size:12px;font-weight:700;margin:12px 0 5px;opacity:.9}
+.patient input{width:100%;border:0;border-radius:8px;padding:10px 12px;font:inherit;color:#13203d}
+.patient .btn{font-size:13px;padding:10px 14px}
+.patient .miniLink{background:none;border:0;color:#d7ecdf;font-size:12px;text-decoration:underline;cursor:pointer;padding:0;margin-top:12px;display:inline-block}
+.patient .patientAlert{border-radius:8px;padding:10px;font-size:12px;line-height:1.4;margin-top:10px}
+.patient .patientAlert.info{background:rgba(255,255,255,.15)}
+.patient .patientAlert.error{background:#5c2320;color:#ffd9d5}
+.citaCard{background:rgba(255,255,255,.1);border-radius:10px;padding:12px;margin-top:10px;font-size:12px}
+.citaCard b{display:block;font-size:13px;margin-bottom:2px}
+.citaCard .estado{opacity:.85}
+.citaCard .citaBtns{display:flex;gap:6px;margin-top:8px}
+.citaCard .citaBtns button{flex:1;font-size:11px;padding:7px 8px;border-radius:6px;border:1px solid rgba(255,255,255,.4);background:transparent;color:#fff;cursor:pointer}
+.citaCard .citaBtns button:disabled{opacity:.4;cursor:not-allowed}
+.miniSlots{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px;max-height:160px;overflow-y:auto}
+.miniSlots button{font-size:11px;padding:6px;border-radius:6px;border:1px solid rgba(255,255,255,.4);background:transparent;color:#fff;cursor:pointer}
+.miniSlots button.active{background:#fff;color:#075b40;font-weight:700}
 @media(max-width:1000px){.row2,.slots{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:600px){.row2,.slots{grid-template-columns:1fr}}@media(max-width:1000px){nav{display:none}.hero,.how,.booking{grid-template-columns:1fr}.heroImg{height:300px}.services{grid-template-columns:repeat(3,1fr)}.quickGrid{grid-template-columns:repeat(2,1fr)}}@media(max-width:600px){header{height:75px}.header>.btn{display:none}.brand b{font-size:12px}.brand small{font-size:10px}.hero h1{font-size:38px}.heroText{padding:45px 7%}.services,.quickGrid,.timeline{grid-template-columns:repeat(2,1fr)}.booking{padding:20px 4%}.steps{overflow:auto;white-space:nowrap}.trust{flex-direction:column;gap:8px}.aiBox{flex-direction:column;align-items:flex-start}.help{margin:35px 4%;padding:25px;display:block}footer{display:block}}

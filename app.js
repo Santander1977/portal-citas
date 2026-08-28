@@ -75,12 +75,6 @@ async function buscarPaciente() {
   estado.buscando = true;
   render();
   try {
-    // Antes: traía TODAS las citas (GET /api/agenda/citas, sin filtro) y
-    // filtraba en el navegador — exponía los datos de todos los pacientes a
-    // cualquier visitante. Ahora usa el endpoint dedicado que solo devuelve
-    // nombre/teléfono de UN documento (mínima exposición). Este endpoint
-    // también quedó sin querer gateado por el secreto de canal de confianza
-    // el 2026-08-28 (commit 8722ca4 lo corrigió).
     const encontrado = await apiGet(`/api/agenda/citas/buscar-paciente?documento=${encodeURIComponent(estado.documento)}`);
     estado.nombre = encontrado.nombre_paciente;
     estado.telefono = encontrado.telefono;
@@ -207,6 +201,7 @@ async function confirmarCita() {
       documento_paciente: estado.documento,
       nombre_paciente: estado.nombre,
       telefono: estado.telefono,
+      correo: estado.correo || null,
       canal: "portal_publico",
     });
     estado.citaCreada = cita;
@@ -441,4 +436,353 @@ function render() {
   wizard.innerHTML = renders[estado.paso]();
 }
 
-document.addEventListener("DOMContentLoaded", render);
+// ================= Portal de pacientes (login documento+teléfono) =================
+// Credenciales revalidadas siempre en el servidor en cada acción (cancelar,
+// reprogramar) — nunca se confía solo en que portal.vista === "citas".
+
+const portal = {
+  vista: "inicio", // inicio | login | citas | reprogramar | recuperar-solicitar | recuperar-codigo
+  documento: "",
+  telefono: "",
+  citas: [],
+  error: null,
+  cargando: false,
+  reprogramarCitaId: null,
+  reprogramarServicioId: null,
+  reprogramarDisponibilidad: [],
+  reprogramarFecha: null,
+  reprogramarSlotId: null,
+  recuperarCorreo: "",
+  recuperarMensaje: null,
+  recuperarCodigo: "",
+};
+
+function portalAbrirLogin() {
+  portal.vista = "login";
+  portal.error = null;
+  renderPortal();
+}
+
+function portalVolverACitas() {
+  portal.vista = "citas";
+  portal.error = null;
+  renderPortal();
+}
+
+function portalVolverInicio() {
+  Object.assign(portal, {
+    vista: "inicio", documento: "", telefono: "", citas: [], error: null, cargando: false,
+    reprogramarCitaId: null, reprogramarServicioId: null, reprogramarDisponibilidad: [],
+    reprogramarFecha: null, reprogramarSlotId: null,
+    recuperarCorreo: "", recuperarMensaje: null, recuperarCodigo: "",
+  });
+  renderPortal();
+}
+
+async function portalLogin() {
+  const doc = document.getElementById("portal-in-documento");
+  const tel = document.getElementById("portal-in-telefono");
+  portal.documento = (doc ? doc.value : "").trim();
+  portal.telefono = (tel ? tel.value : "").trim();
+  if (!portal.documento || !portal.telefono) {
+    portal.error = "Completa documento y teléfono.";
+    renderPortal();
+    return;
+  }
+  portal.error = null;
+  portal.cargando = true;
+  renderPortal();
+  try {
+    portal.citas = await apiPost("/api/agenda/portal/login", {
+      documento_paciente: portal.documento, telefono: portal.telefono,
+    });
+    portal.vista = "citas";
+  } catch (e) {
+    portal.error = "Documento o teléfono incorrectos.";
+  }
+  portal.cargando = false;
+  renderPortal();
+}
+
+async function portalCancelar(citaId) {
+  if (!confirm("¿Seguro que quieres cancelar esta cita?")) return;
+  portal.cargando = true;
+  portal.error = null;
+  renderPortal();
+  try {
+    await apiPost(`/api/agenda/portal/citas/${citaId}/cancelar`, {
+      documento_paciente: portal.documento, telefono: portal.telefono,
+    });
+    portal.citas = await apiPost("/api/agenda/portal/login", {
+      documento_paciente: portal.documento, telefono: portal.telefono,
+    });
+  } catch (e) {
+    portal.error = "No se pudo cancelar la cita.";
+  }
+  portal.cargando = false;
+  renderPortal();
+}
+
+async function portalIniciarReprogramar(citaId, servicioId) {
+  portal.vista = "reprogramar";
+  portal.reprogramarCitaId = citaId;
+  portal.reprogramarServicioId = servicioId;
+  portal.reprogramarFecha = null;
+  portal.reprogramarSlotId = null;
+  portal.error = null;
+  renderPortal();
+  try {
+    const disp = await apiGet("/api/agenda/disponibilidad");
+    portal.reprogramarDisponibilidad = disp.filter(
+      (b) => b.servicio_id === servicioId && b.estado === "Libre"
+    );
+  } catch (e) {
+    portal.error = "No pudimos cargar la disponibilidad.";
+  }
+  renderPortal();
+}
+
+function portalElegirFechaReprogramar(fecha) {
+  portal.reprogramarFecha = fecha;
+  portal.reprogramarSlotId = null;
+  renderPortal();
+}
+
+function portalElegirHoraReprogramar(slotId) {
+  portal.reprogramarSlotId = slotId;
+  renderPortal();
+}
+
+async function portalConfirmarReprogramar() {
+  if (!portal.reprogramarSlotId) return;
+  portal.cargando = true;
+  portal.error = null;
+  renderPortal();
+  try {
+    await apiPost(`/api/agenda/portal/citas/${portal.reprogramarCitaId}/reprogramar`, {
+      documento_paciente: portal.documento, telefono: portal.telefono,
+      nuevo_slot_id: portal.reprogramarSlotId,
+    });
+    portal.citas = await apiPost("/api/agenda/portal/login", {
+      documento_paciente: portal.documento, telefono: portal.telefono,
+    });
+    portal.vista = "citas";
+  } catch (e) {
+    portal.error = "No se pudo reprogramar — puede que ese horario ya no esté disponible.";
+  }
+  portal.cargando = false;
+  renderPortal();
+}
+
+function portalAbrirRecuperar() {
+  portal.vista = "recuperar-solicitar";
+  portal.error = null;
+  portal.recuperarMensaje = null;
+  renderPortal();
+}
+
+async function portalSolicitarCodigo() {
+  const doc = document.getElementById("portal-rec-documento");
+  const correo = document.getElementById("portal-rec-correo");
+  portal.documento = (doc ? doc.value : "").trim();
+  portal.recuperarCorreo = (correo ? correo.value : "").trim();
+  if (!portal.documento || !portal.recuperarCorreo) {
+    portal.error = "Completa documento y correo.";
+    renderPortal();
+    return;
+  }
+  portal.error = null;
+  portal.cargando = true;
+  renderPortal();
+  try {
+    const resultado = await apiPost("/api/agenda/portal/recuperar/solicitar", {
+      documento_paciente: portal.documento, correo: portal.recuperarCorreo,
+    });
+    portal.recuperarMensaje = resultado.mensaje;
+    portal.vista = "recuperar-codigo";
+  } catch (e) {
+    portal.error = "No se pudo procesar la solicitud. Intenta de nuevo.";
+  }
+  portal.cargando = false;
+  renderPortal();
+}
+
+async function portalConfirmarRecuperacion() {
+  const cod = document.getElementById("portal-rec-codigo");
+  const tel = document.getElementById("portal-rec-nuevo-telefono");
+  portal.recuperarCodigo = (cod ? cod.value : "").trim();
+  portal.telefono = (tel ? tel.value : "").trim();
+  if (!portal.recuperarCodigo || !portal.telefono) {
+    portal.error = "Completa el código y el nuevo teléfono.";
+    renderPortal();
+    return;
+  }
+  portal.error = null;
+  portal.cargando = true;
+  renderPortal();
+  try {
+    portal.citas = await apiPost("/api/agenda/portal/recuperar/confirmar", {
+      documento_paciente: portal.documento, codigo: portal.recuperarCodigo, nuevo_telefono: portal.telefono,
+    });
+    portal.vista = "citas";
+  } catch (e) {
+    portal.error = "Código inválido o vencido.";
+  }
+  portal.cargando = false;
+  renderPortal();
+}
+
+function renderPortalError() {
+  return portal.error ? `<div class="patientAlert error">⚠ ${portal.error}</div>` : "";
+}
+
+function renderPortalInicio() {
+  return `
+    <small>PORTAL DE PACIENTES</small>
+    <h3>Gestiona tus citas</h3>
+    <p>Consulta, reprograma o cancela tus citas médicas.</p>
+    <button class="btn white" onclick="portalAbrirLogin()">🔐 Iniciar sesión</button>
+    <a class="btn outline" href="#agendar" style="display:block;text-align:center;">📅 Agendar cita</a>`;
+}
+
+function renderPortalLogin() {
+  return `
+    <small>PORTAL DE PACIENTES</small>
+    <h3>Iniciar sesión</h3>
+    ${renderPortalError()}
+    <label>Documento</label>
+    <input id="portal-in-documento" type="text" value="${portal.documento}">
+    <label>Teléfono</label>
+    <input id="portal-in-telefono" type="text" value="${portal.telefono}">
+    <button class="btn white" onclick="portalLogin()" ${portal.cargando ? "disabled" : ""} style="margin-top:14px;">
+      ${portal.cargando ? "Ingresando…" : "Ingresar"}
+    </button>
+    <button class="miniLink" onclick="portalAbrirRecuperar()">¿Olvidaste tu número? Recuperar acceso</button>
+    <br>
+    <button class="miniLink" onclick="portalVolverInicio()">← Volver</button>`;
+}
+
+function renderPortalCitas() {
+  const citas = portal.citas.slice().sort((a, b) => (a.fecha < b.fecha ? -1 : 1));
+  const puedeGestionar = (estado) => ["agendada", "confirmada", "reprogramada"].includes(estado);
+  return `
+    <small>PORTAL DE PACIENTES</small>
+    <h3>Tus citas</h3>
+    ${renderPortalError()}
+    ${
+      citas.length
+        ? citas
+            .map(
+              (c) => `
+      <div class="citaCard">
+        <b>${c.especialidad}</b>
+        <div>${fmtFecha(c.fecha)} · ${c.hora_inicio}</div>
+        <div>${c.medico}</div>
+        <div class="estado">Estado: ${c.estado}</div>
+        ${
+          puedeGestionar(c.estado)
+            ? `<div class="citaBtns">
+                 <button onclick="portalIniciarReprogramar('${c.cita_id}','${c.servicio_id}')" ${portal.cargando ? "disabled" : ""}>Reprogramar</button>
+                 <button onclick="portalCancelar('${c.cita_id}')" ${portal.cargando ? "disabled" : ""}>Cancelar</button>
+               </div>`
+            : ""
+        }
+      </div>`
+            )
+            .join("")
+        : `<p style="font-size:13px;">No tienes citas registradas.</p>`
+    }
+    <button class="miniLink" onclick="portalVolverInicio()">← Cerrar sesión</button>`;
+}
+
+function renderPortalReprogramar() {
+  const fechas = [...new Set(portal.reprogramarDisponibilidad.map((b) => b.fecha))].sort();
+  const horas = portal.reprogramarFecha
+    ? portal.reprogramarDisponibilidad
+        .filter((b) => b.fecha === portal.reprogramarFecha)
+        .sort((a, b) => a.hora_inicio.localeCompare(b.hora_inicio))
+    : [];
+  return `
+    <small>PORTAL DE PACIENTES</small>
+    <h3>Reprogramar cita</h3>
+    ${renderPortalError()}
+    <label>Nueva fecha</label>
+    <div class="miniSlots">
+      ${
+        fechas.length
+          ? fechas
+              .map(
+                (f) => `<button class="${portal.reprogramarFecha === f ? "active" : ""}" onclick="portalElegirFechaReprogramar('${f}')">${fmtFecha(f)}</button>`
+              )
+              .join("")
+          : '<span style="font-size:12px;">Sin fechas disponibles</span>'
+      }
+    </div>
+    ${
+      portal.reprogramarFecha
+        ? `<label>Nueva hora</label>
+    <div class="miniSlots">
+      ${horas
+        .map(
+          (b) => `<button class="${portal.reprogramarSlotId === b.slot_id ? "active" : ""}" onclick="portalElegirHoraReprogramar('${b.slot_id}')">${b.hora_inicio}</button>`
+        )
+        .join("")}
+    </div>`
+        : ""
+    }
+    <button class="btn white" onclick="portalConfirmarReprogramar()" ${!portal.reprogramarSlotId || portal.cargando ? "disabled" : ""} style="margin-top:14px;">
+      ${portal.cargando ? "Confirmando…" : "Confirmar nuevo horario"}
+    </button>
+    <button class="miniLink" onclick="portalVolverACitas()">← Volver a mis citas</button>`;
+}
+
+function renderPortalRecuperarSolicitar() {
+  return `
+    <small>PORTAL DE PACIENTES</small>
+    <h3>Recuperar acceso</h3>
+    <p>Ingresa tu documento y el correo que diste al agendar.</p>
+    ${renderPortalError()}
+    <label>Documento</label>
+    <input id="portal-rec-documento" type="text" value="${portal.documento}">
+    <label>Correo</label>
+    <input id="portal-rec-correo" type="email" value="${portal.recuperarCorreo}">
+    <button class="btn white" onclick="portalSolicitarCodigo()" ${portal.cargando ? "disabled" : ""} style="margin-top:14px;">
+      ${portal.cargando ? "Enviando…" : "Enviar código"}
+    </button>
+    <button class="miniLink" onclick="portalAbrirLogin()">← Volver</button>`;
+}
+
+function renderPortalRecuperarCodigo() {
+  return `
+    <small>PORTAL DE PACIENTES</small>
+    <h3>Ingresa el código</h3>
+    ${portal.recuperarMensaje ? `<div class="patientAlert info">${portal.recuperarMensaje}</div>` : ""}
+    ${renderPortalError()}
+    <label>Código de 6 dígitos</label>
+    <input id="portal-rec-codigo" type="text" maxlength="6" value="${portal.recuperarCodigo}">
+    <label>Nuevo número de teléfono</label>
+    <input id="portal-rec-nuevo-telefono" type="text" value="${portal.telefono}">
+    <button class="btn white" onclick="portalConfirmarRecuperacion()" ${portal.cargando ? "disabled" : ""} style="margin-top:14px;">
+      ${portal.cargando ? "Verificando…" : "Confirmar"}
+    </button>
+    <button class="miniLink" onclick="portalAbrirLogin()">← Volver</button>`;
+}
+
+function renderPortal() {
+  const el = document.getElementById("portal");
+  if (!el) return;
+  const renders = {
+    inicio: renderPortalInicio,
+    login: renderPortalLogin,
+    citas: renderPortalCitas,
+    reprogramar: renderPortalReprogramar,
+    "recuperar-solicitar": renderPortalRecuperarSolicitar,
+    "recuperar-codigo": renderPortalRecuperarCodigo,
+  };
+  el.innerHTML = renders[portal.vista]();
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  render();
+  renderPortal();
+});
