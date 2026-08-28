@@ -74,20 +74,22 @@ async function buscarPaciente() {
   estado.buscando = true;
   render();
   try {
-    const citas = await apiGet("/api/agenda/citas");
-    const coincidencias = citas.filter(
-      (c) => String(c.documento_paciente || "").trim() === estado.documento
-    );
-    if (coincidencias.length) {
-      coincidencias.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
-      estado.nombre = coincidencias[0].nombre_paciente;
-      estado.telefono = coincidencias[0].telefono;
-      estado.encontrado = true;
-    } else {
-      estado.encontrado = false;
-    }
+    // Antes: traía TODAS las citas (GET /api/agenda/citas, sin filtro) y
+    // filtraba en el navegador — exponía los datos de todos los pacientes a
+    // cualquier visitante. Ahora usa el endpoint dedicado que solo devuelve
+    // nombre/teléfono de UN documento (mínima exposición). Este endpoint
+    // también quedó sin querer gateado por el secreto de canal de confianza
+    // el 2026-08-28 (commit 8722ca4 lo corrigió).
+    const encontrado = await apiGet(`/api/agenda/citas/buscar-paciente?documento=${encodeURIComponent(estado.documento)}`);
+    estado.nombre = encontrado.nombre_paciente;
+    estado.telefono = encontrado.telefono;
+    estado.encontrado = true;
   } catch (e) {
-    estado.error = "No pudimos conectar con el sistema de citas. Intenta de nuevo en un momento.";
+    if (String(e.message).includes("404")) {
+      estado.encontrado = false;
+    } else {
+      estado.error = "No pudimos conectar con el sistema de citas. Intenta de nuevo en un momento.";
+    }
   }
   estado.buscando = false;
   render();
