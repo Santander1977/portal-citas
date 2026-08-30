@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Confirmar mi llegada | HRMM</title>
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://curson8n-hrmm-backend.byrp3l.easypanel.host/static/tokens.css">
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--ink);
+    color: var(--text);
+    font-family: var(--font-sans);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-5);
+  }
+  .card {
+    width: 100%;
+    max-width: 420px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    padding: var(--space-6);
+  }
+  h1 {
+    font-size: 1.25rem;
+    margin: 0 0 var(--space-2);
+  }
+  .sub {
+    color: var(--text-dim);
+    font-size: 0.9rem;
+    margin: 0 0 var(--space-5);
+    line-height: 1.5;
+  }
+  .datos p {
+    margin: 0 0 var(--space-2);
+    font-size: 0.95rem;
+  }
+  .datos b { color: var(--text); }
+  .datos { color: var(--text-dim); margin-bottom: var(--space-5); }
+
+  .estado-msg {
+    background: var(--panel-2);
+    border-left: 4px solid var(--brand);
+    border-radius: var(--radius-sm);
+    padding: var(--space-4);
+    font-size: 0.95rem;
+    line-height: 1.5;
+  }
+  .estado-msg.error { border-left-color: var(--danger); }
+
+  .campo { margin-bottom: var(--space-4); }
+  label {
+    display: block;
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    margin-bottom: var(--space-2);
+  }
+  input[type="text"] {
+    width: 100%;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 1.4rem;
+    letter-spacing: 0.15em;
+    text-align: center;
+    padding: var(--space-3);
+  }
+  input[type="text"]:focus { outline: 2px solid var(--brand); }
+
+  button {
+    width: 100%;
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: var(--space-3) var(--space-4);
+    font-family: var(--font-sans);
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+  }
+  .btn-primary { background: var(--brand); color: #fff; margin-bottom: var(--space-3); }
+  .btn-secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); }
+  button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+  .divisor {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    color: var(--text-faint);
+    font-size: 0.8rem;
+    margin: var(--space-5) 0;
+  }
+  .divisor::before, .divisor::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--line);
+  }
+
+  video { width: 100%; border-radius: var(--radius-sm); background: #000; display: block; }
+  .camara { margin-bottom: var(--space-4); display: none; }
+  .camara.activa { display: block; }
+
+  .turno-numero {
+    font-family: var(--font-mono);
+    font-size: 3.5rem;
+    font-weight: 700;
+    color: var(--brand);
+    text-align: center;
+    margin: var(--space-4) 0;
+  }
+  .oculto { display: none; }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div id="contenido">
+    <p class="sub">Cargando tu cita…</p>
+  </div>
+</div>
+
+<script src="vendor/jsQR.min.js"></script>
+<script>
+const API_BASE = "https://curson8n-hrmm-backend.byrp3l.easypanel.host";
+
+const params = new URLSearchParams(location.search);
+const citaId = params.get("cita_id");
+const token = params.get("token");
+const contenido = document.getElementById("contenido");
+
+let flujoCamara = null;
+let animFrame = null;
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[c]));
+}
+
+function detenerCamara() {
+  if (animFrame) cancelAnimationFrame(animFrame);
+  animFrame = null;
+  if (flujoCamara) {
+    flujoCamara.getTracks().forEach((t) => t.stop());
+    flujoCamara = null;
+  }
+}
+
+function formatearSegundos(s) {
+  const min = Math.floor(s / 60);
+  if (min < 1) return "menos de un minuto";
+  if (min === 1) return "1 minuto";
+  return `${min} minutos`;
+}
+
+async function apiGet(path) {
+  const resp = await fetch(API_BASE + path);
+  const data = await resp.json().catch(() => ({}));
+  return { ok: resp.ok, status: resp.status, data };
+}
+
+async function apiPost(path, body) {
+  const resp = await fetch(API_BASE + path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await resp.json().catch(() => ({}));
+  return { ok: resp.ok, status: resp.status, data };
+}
+
+function renderSinDatos(mensaje) {
+  contenido.innerHTML = `
+    <h1>No pudimos abrir tu cita</h1>
+    <div class="estado-msg error">${escapeHtml(mensaje)}</div>
+  `;
+}
+
+function renderExito(numeroTurno) {
+  detenerCamara();
+  contenido.innerHTML = `
+    <h1>✓ Llegada confirmada</h1>
+    <p class="sub">Tu número de turno es:</p>
+    <div class="turno-numero">${escapeHtml(numeroTurno)}</div>
+    <div class="estado-msg">Te avisaremos por correo cuando te llamemos. Mientras tanto, sigue el estado de la fila en la pantalla de la sala de espera.</div>
+  `;
+}
+
+function renderCerrado(info) {
+  contenido.innerHTML = `
+    <h1>${escapeHtml(info.nombre_paciente)}</h1>
+    <div class="datos">
+      <p><b>Fecha:</b> ${escapeHtml(info.fecha)}</p>
+      <p><b>Hora:</b> ${escapeHtml(info.hora_inicio)}</p>
+      <p><b>Especialidad:</b> ${escapeHtml(info.especialidad)}</p>
+    </div>
+    <div class="estado-msg error">El check-in para esta cita ya cerró. Si todavía necesitas atención, acércate directamente al tótem de la entrada del hospital.</div>
+  `;
+}
+
+function renderAunNoAbre(info) {
+  contenido.innerHTML = `
+    <h1>${escapeHtml(info.nombre_paciente)}</h1>
+    <div class="datos">
+      <p><b>Fecha:</b> ${escapeHtml(info.fecha)}</p>
+      <p><b>Hora:</b> ${escapeHtml(info.hora_inicio)}</p>
+      <p><b>Especialidad:</b> ${escapeHtml(info.especialidad)}</p>
+    </div>
+    <div class="estado-msg">Todavía es muy pronto para confirmar tu llegada. Podrás hacerlo en ${formatearSegundos(info.segundos_para_apertura)}, cuando estés cerca del hospital. Vuelve a abrir este mismo enlace en ese momento.</div>
+  `;
+}
+
+function renderFormulario(info) {
+  contenido.innerHTML = `
+    <h1>${escapeHtml(info.nombre_paciente)}</h1>
+    <div class="datos">
+      <p><b>Fecha:</b> ${escapeHtml(info.fecha)}</p>
+      <p><b>Hora:</b> ${escapeHtml(info.hora_inicio)}</p>
+      <p><b>Especialidad:</b> ${escapeHtml(info.especialidad)}</p>
+      <p><b>Lugar:</b> ${escapeHtml(info.consultorio)}</p>
+    </div>
+    <p class="sub">Para confirmar que ya llegaste, escanea el código que aparece en la pantalla de la sala de espera, o escríbelo a mano.</p>
+
+    <button class="btn-secondary" id="btn-camara" type="button">📷 Escanear código con la cámara</button>
+    <div class="camara" id="zona-camara">
+      <video id="video" playsinline autoplay muted></video>
+      <canvas id="canvas" class="oculto"></canvas>
+    </div>
+
+    <div class="divisor">o escribe el código</div>
+
+    <div class="campo">
+      <label for="in-codigo">Código de 6 dígitos</label>
+      <input type="text" id="in-codigo" inputmode="numeric" maxlength="6" placeholder="000000">
+    </div>
+    <div id="msg-form"></div>
+    <button class="btn-primary" id="btn-confirmar" type="button">Confirmar mi llegada</button>
+  `;
+
+  document.getElementById("btn-camara").addEventListener("click", activarCamara);
+  document.getElementById("btn-confirmar").addEventListener("click", () => {
+    const codigo = document.getElementById("in-codigo").value.trim();
+    enviarConfirmacion(codigo);
+  });
+  document.getElementById("in-codigo").addEventListener("input", (e) => {
+    e.target.value = e.target.value.replace(/\D/g, "").slice(0, 6);
+  });
+}
+
+function extraerCodigoDeTexto(texto) {
+  try {
+    const url = new URL(texto);
+    const c = url.searchParams.get("codigo");
+    if (c) return c;
+  } catch (_) {
+    // no era una URL, sigue de largo
+  }
+  const soloDigitos = texto.replace(/\D/g, "");
+  return soloDigitos.slice(0, 6);
+}
+
+async function activarCamara() {
+  const zona = document.getElementById("zona-camara");
+  const video = document.getElementById("video");
+  const canvas = document.getElementById("canvas");
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+
+  try {
+    flujoCamara = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "environment" },
+    });
+  } catch (e) {
+    document.getElementById("msg-form").innerHTML =
+      '<div class="estado-msg error">No pudimos acceder a la cámara. Usa el código escrito en su lugar.</div>';
+    return;
+  }
+
+  video.srcObject = flujoCamara;
+  zona.classList.add("activa");
+
+  function tick() {
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const imagen = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const resultado = jsQR(imagen.data, imagen.width, imagen.height);
+      if (resultado && resultado.data) {
+        const codigo = extraerCodigoDeTexto(resultado.data);
+        if (codigo.length === 6) {
+          document.getElementById("in-codigo").value = codigo;
+          enviarConfirmacion(codigo);
+          return;
+        }
+      }
+    }
+    animFrame = requestAnimationFrame(tick);
+  }
+  animFrame = requestAnimationFrame(tick);
+}
+
+async function enviarConfirmacion(codigo) {
+  const msg = document.getElementById("msg-form");
+  if (!codigo || codigo.length !== 6) {
+    msg.innerHTML = '<div class="estado-msg error">Ingresa o escanea el código de 6 dígitos primero.</div>';
+    return;
+  }
+  const btn = document.getElementById("btn-confirmar");
+  btn.disabled = true;
+  msg.innerHTML = "";
+
+  const { ok, status, data } = await apiPost(
+    `/api/turnos/confirmar/${encodeURIComponent(citaId)}?token=${encodeURIComponent(token)}`,
+    { codigo }
+  );
+
+  if (ok) {
+    renderExito(data.numero_turno);
+    return;
+  }
+
+  detenerCamara();
+  btn.disabled = false;
+  let mensaje;
+  if (status === 422) {
+    mensaje = (data && data.detail) || "Ese código ya no es válido, mira el código actual en la pantalla.";
+  } else if (status === 409) {
+    mensaje = (data && data.detail && data.detail.mensaje) || (data && data.detail) || "No se pudo confirmar tu llegada.";
+  } else {
+    mensaje = "No se pudo confirmar tu llegada. Intenta de nuevo.";
+  }
+  msg.innerHTML = `<div class="estado-msg error">${escapeHtml(String(mensaje))}</div>`;
+}
+
+async function iniciar() {
+  if (!citaId || !token) {
+    renderSinDatos("Este enlace no es válido. Usa el enlace del correo de confirmación de tu cita.");
+    return;
+  }
+
+  const { ok, status, data } = await apiGet(
+    `/api/turnos/confirmar/${encodeURIComponent(citaId)}?token=${encodeURIComponent(token)}`
+  );
+
+  if (!ok) {
+    if (status === 401) {
+      renderSinDatos("Este enlace no es válido o ya expiró. Usa el enlace más reciente que te enviamos por correo.");
+    } else if (status === 404) {
+      renderSinDatos("No encontramos esa cita.");
+    } else {
+      renderSinDatos("No pudimos cargar tu cita en este momento. Intenta de nuevo en unos minutos.");
+    }
+    return;
+  }
+
+  if (data.ya_checkin) {
+    renderExito(data.numero_turno);
+  } else if (data.ya_cerro) {
+    renderCerrado(data);
+  } else if (!data.ventana_abierta) {
+    renderAunNoAbre(data);
+  } else {
+    renderFormulario(data);
+  }
+}
+
+iniciar();
+</script>
+</body>
+</html>

@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Check-in | HRMM</title>
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://curson8n-hrmm-backend.byrp3l.easypanel.host/static/tokens.css">
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    height: 100%;
+    margin: 0;
+    overscroll-behavior: none;
+  }
+  body {
+    background: var(--ink);
+    color: var(--text);
+    font-family: var(--font-sans);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-6);
+  }
+  .marca {
+    position: absolute;
+    top: var(--space-6);
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 1.1rem;
+    font-weight: 600;
+  }
+  .pantalla {
+    width: 100%;
+    max-width: 720px;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-5);
+  }
+  h1 {
+    font-size: 2rem;
+    text-align: center;
+    margin: 0 0 var(--space-2);
+  }
+  .sub {
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 1.1rem;
+    margin: 0 0 var(--space-4);
+    line-height: 1.5;
+  }
+
+  .opciones {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-5);
+  }
+  .opcion {
+    background: var(--panel);
+    border: 2px solid var(--line);
+    border-radius: var(--radius-lg);
+    padding: var(--space-6) var(--space-5);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 1.4rem;
+    font-weight: 700;
+    text-align: center;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-4);
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .opcion .icono { font-size: 3.5rem; }
+  .opcion:active { background: var(--panel-2); border-color: var(--brand); }
+
+  .motivos {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+  .motivo {
+    border: 2px solid var(--line);
+    border-radius: var(--radius-md);
+    padding: var(--space-4) var(--space-5);
+    font-family: var(--font-sans);
+    font-size: 1.2rem;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+    color: var(--text);
+    background: var(--panel);
+  }
+  .motivo:active { background: var(--panel-2); }
+  #motivo-tramite_general { border-left: 6px solid var(--t-general); }
+  #motivo-tramite_especial { border-left: 6px solid var(--t-especial); }
+  #motivo-informacion { border-left: 6px solid var(--t-info); }
+
+  input[type="text"] {
+    width: 100%;
+    background: var(--panel-2);
+    border: 2px solid var(--line);
+    border-radius: var(--radius-md);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 2.2rem;
+    letter-spacing: 0.08em;
+    text-align: center;
+    padding: var(--space-4);
+  }
+  input[type="text"]:focus { outline: 2px solid var(--brand); }
+
+  button.grande {
+    width: 100%;
+    border: none;
+    border-radius: var(--radius-md);
+    padding: var(--space-4);
+    font-family: var(--font-sans);
+    font-weight: 700;
+    font-size: 1.3rem;
+    cursor: pointer;
+  }
+  .btn-primary { background: var(--brand); color: #fff; }
+  .btn-secundario { background: var(--panel-2); color: var(--text); border: 2px solid var(--line); }
+  button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+  .estado-msg {
+    background: var(--panel-2);
+    border-left: 4px solid var(--brand);
+    border-radius: var(--radius-sm);
+    padding: var(--space-4);
+    font-size: 1.05rem;
+    line-height: 1.5;
+  }
+  .estado-msg.error { border-left-color: var(--danger); }
+
+  .turno-numero {
+    font-family: var(--font-mono);
+    font-size: 5rem;
+    font-weight: 700;
+    color: var(--brand);
+    text-align: center;
+    margin: var(--space-3) 0;
+  }
+  .contador {
+    text-align: center;
+    color: var(--text-faint);
+    font-size: 0.95rem;
+  }
+</style>
+</head>
+<body>
+
+<div class="marca">🏥 HOSPITAL REGIONAL DEL MAGDALENA MEDIO — CHECK-IN</div>
+
+<div class="pantalla" id="pantalla"></div>
+
+<script>
+const API_BASE = "https://curson8n-hrmm-backend.byrp3l.easypanel.host";
+const pantalla = document.getElementById("pantalla");
+
+const MOTIVOS = {
+  tramite_general: { label: "Trámite general", detalle: "Otro trámite no especializado" },
+  tramite_especial: { label: "Trámite especial", detalle: "Trámite que requiere atención especial" },
+  informacion: { label: "Información", detalle: "Solo necesito información" },
+};
+
+let resetTimer = null;
+let cuentaInterval = null;
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[c]));
+}
+
+function cancelarTimers() {
+  if (resetTimer) clearTimeout(resetTimer);
+  if (cuentaInterval) clearInterval(cuentaInterval);
+  resetTimer = null;
+  cuentaInterval = null;
+}
+
+async function apiPost(path, body) {
+  const resp = await fetch(API_BASE + path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await resp.json().catch(() => ({}));
+  return { ok: resp.ok, status: resp.status, data };
+}
+
+function renderInicio() {
+  cancelarTimers();
+  pantalla.innerHTML = `
+    <h1>Bienvenido(a)</h1>
+    <p class="sub">Toca una opción para registrar tu llegada.</p>
+    <div class="opciones">
+      <div class="opcion" id="op-cita"><span class="icono">📅</span>Tengo una cita</div>
+      <div class="opcion" id="op-sin-cita"><span class="icono">📋</span>No tengo cita</div>
+    </div>
+  `;
+  document.getElementById("op-cita").addEventListener("click", () => renderPedirDocumento(null));
+  document.getElementById("op-sin-cita").addEventListener("click", renderElegirMotivo);
+}
+
+function renderElegirMotivo() {
+  pantalla.innerHTML = `
+    <h1>¿Qué necesitas hoy?</h1>
+    <p class="sub">Elige la opción que mejor describe tu trámite.</p>
+    <div class="motivos">
+      ${Object.entries(MOTIVOS).map(([clave, m]) => `
+        <button class="motivo" id="motivo-${clave}">${escapeHtml(m.label)}</button>
+      `).join("")}
+    </div>
+    <button class="grande btn-secundario" id="btn-volver">← Volver</button>
+  `;
+  Object.keys(MOTIVOS).forEach((clave) => {
+    document.getElementById(`motivo-${clave}`).addEventListener("click", () => renderPedirDocumento(clave));
+  });
+  document.getElementById("btn-volver").addEventListener("click", renderInicio);
+}
+
+function renderPedirDocumento(motivo) {
+  pantalla.innerHTML = `
+    <h1>Tu número de documento</h1>
+    <p class="sub">${motivo ? escapeHtml(MOTIVOS[motivo].label) : "Escribe el documento con el que tienes tu cita."}</p>
+    <input type="text" id="in-documento" inputmode="numeric" placeholder="0000000000" autofocus>
+    <div id="msg-doc"></div>
+    <button class="grande btn-primary" id="btn-continuar">Continuar</button>
+    <button class="grande btn-secundario" id="btn-volver">← Volver</button>
+  `;
+  const input = document.getElementById("in-documento");
+  input.addEventListener("input", (e) => {
+    e.target.value = e.target.value.replace(/\D/g, "").slice(0, 15);
+  });
+  input.focus();
+  document.getElementById("btn-continuar").addEventListener("click", () => confirmarCheckIn(motivo));
+  document.getElementById("btn-volver").addEventListener("click", motivo ? renderElegirMotivo : renderInicio);
+}
+
+async function confirmarCheckIn(motivo) {
+  const input = document.getElementById("in-documento");
+  const documento = input.value.trim();
+  const msg = document.getElementById("msg-doc");
+  if (!documento) {
+    msg.innerHTML = '<div class="estado-msg error">Escribe tu número de documento.</div>';
+    return;
+  }
+  const btn = document.getElementById("btn-continuar");
+  btn.disabled = true;
+  msg.innerHTML = "";
+
+  const cuerpo = motivo
+    ? { documento_paciente: documento, motivo, motivo_detalle: MOTIVOS[motivo].detalle }
+    : { documento_paciente: documento };
+
+  const { ok, status, data } = await apiPost("/api/turnos/check-in", cuerpo);
+
+  if (ok) {
+    renderExito(data.numero_turno);
+    return;
+  }
+
+  btn.disabled = false;
+  if (status === 422 && !motivo) {
+    msg.innerHTML = `
+      <div class="estado-msg error">No encontramos una cita para hoy con ese documento. Si tu trámite es otro, usa la opción "No tengo cita".</div>
+    `;
+  } else if (status === 409) {
+    const detalle = (data && data.detail) || {};
+    const texto = detalle.ya_cerro
+      ? "El check-in para tu cita ya cerró. Acércate a información."
+      : "Todavía es muy pronto para hacer check-in de tu cita. Acércate a información si tienes dudas.";
+    msg.innerHTML = `<div class="estado-msg error">${escapeHtml(texto)}</div>`;
+  } else {
+    msg.innerHTML = '<div class="estado-msg error">No pudimos registrar tu llegada. Intenta de nuevo o acércate a información.</div>';
+  }
+}
+
+function renderExito(numeroTurno) {
+  pantalla.innerHTML = `
+    <h1>✓ Listo</h1>
+    <p class="sub">Tu número de turno es:</p>
+    <div class="turno-numero">${escapeHtml(numeroTurno)}</div>
+    <div class="estado-msg">Espera a que te llamemos por pantalla y audio en la sala de espera.</div>
+    <p class="contador" id="contador"></p>
+    <button class="grande btn-secundario" id="btn-nuevo">Registrar otra llegada</button>
+  `;
+  document.getElementById("btn-nuevo").addEventListener("click", renderInicio);
+
+  let restante = 20;
+  const contador = document.getElementById("contador");
+  contador.textContent = `Volviendo al inicio en ${restante}s...`;
+  cuentaInterval = setInterval(() => {
+    restante -= 1;
+    if (contador) contador.textContent = `Volviendo al inicio en ${restante}s...`;
+    if (restante <= 0) renderInicio();
+  }, 1000);
+}
+
+renderInicio();
+</script>
+</body>
+</html>
