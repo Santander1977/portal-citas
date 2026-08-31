@@ -310,7 +310,7 @@ function renderPaso1() {
 }
 
 function renderPaso2() {
-  const iconos = { "Medicina General": "🩺", "Pediatría": "🧒", "Odontología": "🦷", "Ginecología": "♀️", "Psicología": "🧠", "Urgencias": "➕" };
+  const iconos = { "Medicina General": "🩺", "Pediatria": "🧒", "Odontologia": "🦷", "Psicologia": "🧠", "Urgencias": "➕" };
   return `
     <h2>Selecciona el servicio</h2><p class="muted">Elige la especialidad que necesitas.</p>
     ${renderError()}
